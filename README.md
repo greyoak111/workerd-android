@@ -16,7 +16,16 @@ workerd 本身就有关掉 tcmalloc 的编译开关（原本给 ASan 构建用�
 
 ## 用法
 
-在 Actions 里手动运行 `build`，填入要编的 workerd 版本标签（要和 wrangler 自带的 workerd 版本一致）。产物发布在同名 Release。
+在 Actions 里手动运行 `build`，填入要编的 workerd 版本标签（要和 wrangler 自带的 workerd 版本一致）。产物发布在同名 Release：
+
+| 文件 | 是什么 |
+|---|---|
+| `workerd` | 编出来的原样二进制（解释器是 `/lib/ld-linux-aarch64.so.1`，在安卓上要显式经 glibc 加载器启动） |
+| `workerd.gz` | 同上，压缩版 |
+| `workerd-cc.codroid` | 同一份二进制，只用 patchelf 把解释器改成 cccodroid 的 glibc 加载器（`/data/data/cc.codroid/files/usr/glibc/lib/ld-linux-aarch64.so.1`），给 cccodroid 组件用 |
+| `SHA256SUMS` | 以上三个的 sha256 |
+
+早于构建流程加上 cc.codroid 版的 Release，可以手动运行 `cc.codroid 构件`（`cc-codroid.yml`）补上。
 
 ## 许可
 

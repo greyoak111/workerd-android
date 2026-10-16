@@ -46,13 +46,18 @@ jobs:
           mkdir -p ../out && cp bazel-bin/src/workerd/server/workerd ../out/workerd
           chmod 755 ../out/workerd
           ../out/workerd --version
-          ( cd ../out && gzip -9k workerd && sha256sum workerd workerd.gz > SHA256SUMS )
+          # 给 cccodroid 组件的一份：解释器改成 cccodroid 的 glibc 加载器，别的字节不动（同 cc-codroid.yml）
+          sudo apt-get install -y -qq patchelf
+          cp ../out/workerd ../out/workerd-cc.codroid
+          patchelf --set-interpreter /data/data/cc.codroid/files/usr/glibc/lib/ld-linux-aarch64.so.1 ../out/workerd-cc.codroid
+          /lib/ld-linux-aarch64.so.1 ../out/workerd-cc.codroid --version
+          ( cd ../out && gzip -9k workerd && sha256sum workerd workerd.gz workerd-cc.codroid > SHA256SUMS )
       - name: 发布
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           T=${{ inputs.tag }}
-          gh release create "$T" out/workerd.gz out/SHA256SUMS -R ${{ github.repository }} \
+          gh release create "$T" out/workerd out/workerd.gz out/workerd-cc.codroid out/SHA256SUMS -R ${{ github.repository }} \
             --title "workerd $T（linux-arm64，无 tcmalloc）" \
             --notes "上游 cloudflare/workerd $T，按官方 release_linux 配置编译，仅加 use_tcmalloc=False。用于安卓（39 位地址空间）经 glibc 加载器运行。" \
-          || gh release upload "$T" out/workerd.gz out/SHA256SUMS -R ${{ github.repository }} --clobber
+          || gh release upload "$T" out/workerd out/workerd.gz out/workerd-cc.codroid out/SHA256SUMS -R ${{ github.repository }} --clobber
