@@ -1,0 +1,40 @@
+name: cc.codroid 构件
+# 给 cccodroid 组件用的一份：解释器改成 cccodroid 自带的 glibc 加载器，别的一个字节不动。
+# 原版 workerd 的解释器是 /lib/ld-linux-aarch64.so.1，安卓上没有，只能靠包装脚本显式经加载器起；
+# 改过之后组件审计能核对解释器，二进制也能直接执行。
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 已发布的版本标签
+        default: v1.20261012.1
+permissions:
+  contents: write
+jobs:
+  variant:
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - name: 取已发布的 workerd 并核对
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir out && cd out
+          gh release download "${{ inputs.tag }}" -R ${{ github.repository }} -p SHA256SUMS -p workerd.gz
+          gunzip -k workerd.gz
+          grep ' workerd.gz$' SHA256SUMS | sha256sum -c -
+          grep ' workerd$' SHA256SUMS | sha256sum -c -
+      - name: 改解释器
+        working-directory: out
+        run: |
+          sudo apt-get install -y -qq patchelf
+          cp workerd workerd-cc.codroid
+          patchelf --set-interpreter /data/data/cc.codroid/files/usr/glibc/lib/ld-linux-aarch64.so.1 workerd-cc.codroid
+          readelf -l workerd-cc.codroid | grep -A1 INTERP
+          /lib/ld-linux-aarch64.so.1 ./workerd-cc.codroid --version
+          chmod 755 workerd workerd-cc.codroid
+          sha256sum workerd workerd.gz workerd-cc.codroid > SHA256SUMS
+          cat SHA256SUMS
+      - name: 上传
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" out/workerd out/workerd-cc.codroid out/SHA256SUMS -R ${{ github.repository }} --clobber
